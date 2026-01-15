@@ -2,57 +2,39 @@
 
 FlexCAN_T4<CAN2, RX_SIZE_256, TX_SIZE_16> Can0;
 
-// ===============================
-// PRINT EVERY RECEIVED CAN FRAME
-// ===============================
-void printFrame(const CAN_message_t &msg)
-{
-  Serial.print("CAN RX -> ID: 0x");
+void printFrame(const CAN_message_t &msg) {
+  Serial.print("RX: 0x");
   Serial.print(msg.id, HEX);
-
-  if (msg.flags.extended)
-    Serial.print(" (EXT)  ");
-  else
-    Serial.print(" (STD)  ");
-
-  Serial.print("DLC: ");
+  Serial.print(" Len: ");
   Serial.print(msg.len);
-  Serial.print("  Data: ");
-
+  Serial.print(" Data: ");
   for (int i = 0; i < msg.len; i++) {
     Serial.print(msg.buf[i], HEX);
     Serial.print(" ");
   }
-
-  Serial.print("  @ ");
-  Serial.print(millis());
-  Serial.println(" ms");
+  Serial.println();
 }
 
-// ===============================
-// SETUP
-// ===============================
 void setup() {
   Serial.begin(115200);
-  delay(300);
+  delay(200);
 
-  // Start CAN
   Can0.begin();
   Can0.setBaudRate(500000);
-  Can0.setMaxMB(16);
+  
+  // Standard pins for CAN2 on Teensy 4.0/4.1 are 0(RX) and 1(TX)
+  // Can0.setPins(0, 1); 
 
-  // FIFO + interrupt listener
   Can0.enableFIFO();
-  Can0.enableFIFOInterrupt();
+  
+  // FIXED: Interrupts disabled to allow safe Serial printing
+  // Can0.enableFIFOInterrupt(); 
+  
   Can0.onReceive(printFrame);
-
-  Serial.println("Simple CAN listener started...");
+  Serial.println("CAN Receiver Started");
 }
 
-// ===============================
-// MAIN LOOP
-// ===============================
 void loop() {
-  // Process CAN events
+  // polling the queue in the loop is safe for Serial
   Can0.events();
 }
