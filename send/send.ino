@@ -1,9 +1,8 @@
-#include <FlexCAN_T4.h>
-
-// CHANGE CAN1 / CAN2 IF NEEDED
-FlexCAN_T4<CAN2, RX_SIZE_256, TX_SIZE_16> Can0;
+#include <ACAN_T4.h>
 
 #define SEND_PERIOD_MS 10
+
+ACAN_T4 can;
 
 void setup() {
   Serial.begin(115200);
@@ -11,34 +10,43 @@ void setup() {
 
   randomSeed(analogRead(A0));  // entropy
 
-  Can0.begin();
-  // Can0.setPins(1, 0);
-  Can0.setBaudRate(500000);
-  Can0.setMaxMB(16);
-  Can0.mailboxStatus();
+  // Configure CAN settings
+  ACAN_T4_Settings settings(500 * 1000); // 500 kbps
+  settings.mDriverType = ACAN_T4_Settings::DriverType::MCP2551;
+  settings.mBitRatePrescaler = 1;
+  settings.mPhaseSegment1 = 14;
+  settings.mPhaseSegment2 = 5;
+  settings.mSJW = 4;
+  settings.mTripleSampling = false;
 
-
-  Serial.println("Random CAN sender started...");
+  // Initialize CAN bus
+  const uint32_t errorCode = can.begin(settings);
+  if (errorCode == 0) {
+    Serial.println("Random CAN sender started...");
+  } else {
+    Serial.print("CAN initialization error: 0x");
+    Serial.println(errorCode, HEX);
+  }
 }
 
 void loop() {
-  CAN_message_t msg;
+  CANMessage msg;
 
   // ---------- CAN ID ----------
   msg.id = random(0x000, 0x7FF);   // standard 11-bit ID
-  msg.flags.extended = 0;          // standard frame
-  msg.flags.remote = 0;
+  msg.ext = false;                 // standard frame
+  msg.rtr = false;                 // data frame
 
   // ---------- DLC ----------
   msg.len = random(1, 9);          // 1–8 bytes
 
   // ---------- DATA ----------
   for (int i = 0; i < msg.len; i++) {
-    msg.buf[i] = random(0, 256);
+    msg.data8[i] = random(0, 256);
   }
 
   // ---------- SEND ----------
-  bool ok = Can0.write(msg);
+  bool ok = can.tryToSend(msg);
 
   // ---------- SERIAL DEBUG ----------
   Serial.print("CAN TX -> ID: 0x");
@@ -48,7 +56,7 @@ void loop() {
   Serial.print(" Data: ");
 
   for (int i = 0; i < msg.len; i++) {
-    Serial.print(msg.buf[i], HEX);
+    Serial.print(msg.data8[i], HEX);
     Serial.print(" ");
   }
 

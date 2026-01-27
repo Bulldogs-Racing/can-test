@@ -1,15 +1,15 @@
-#include <FlexCAN_T4.h>
+#include <ACAN_T4.h>
 
-FlexCAN_T4<CAN2, RX_SIZE_256, TX_SIZE_16> Can0;
+ACAN_T4 can;
 
-void printFrame(const CAN_message_t &msg) {
+void printFrame(const CANMessage &msg) {
   Serial.print("RX: 0x");
   Serial.print(msg.id, HEX);
   Serial.print(" Len: ");
   Serial.print(msg.len);
   Serial.print(" Data: ");
   for (int i = 0; i < msg.len; i++) {
-    Serial.print(msg.buf[i], HEX);
+    Serial.print(msg.data8[i], HEX);
     Serial.print(" ");
   }
   Serial.println();
@@ -19,22 +19,28 @@ void setup() {
   Serial.begin(115200);
   delay(200);
 
-  Can0.begin();
-  Can0.setBaudRate(500000);
-  
-  // Standard pins for CAN2 on Teensy 4.0/4.1 are 0(RX) and 1(TX)
-  // Can0.setPins(0, 1); 
+  // Configure CAN settings
+  ACAN_T4_Settings settings(500 * 1000); // 500 kbps
+  settings.mDriverType = ACAN_T4_Settings::DriverType::MCP2551;
+  settings.mBitRatePrescaler = 1;
+  settings.mPhaseSegment1 = 14;
+  settings.mPhaseSegment2 = 5;
+  settings.mSJW = 4;
+  settings.mTripleSampling = false;
 
-  Can0.enableFIFO();
-  
-  // FIXED: Interrupts disabled to allow safe Serial printing
-  // Can0.enableFIFOInterrupt(); 
-  
-  Can0.onReceive(printFrame);
-  Serial.println("CAN Receiver Started");
+  // Initialize CAN bus
+  const uint32_t errorCode = can.begin(settings);
+  if (errorCode == 0) {
+    Serial.println("CAN Receiver Started");
+  } else {
+    Serial.print("CAN initialization error: 0x");
+    Serial.println(errorCode, HEX);
+  }
 }
 
 void loop() {
-  // polling the queue in the loop is safe for Serial
-  Can0.events();
+  CANMessage msg;
+  if (can.receive(msg)) {
+    printFrame(msg);
+  }
 }
